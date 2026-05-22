@@ -59,6 +59,16 @@ xcodebuild \
     -framework "$FRAMEWORK_PATH" \
     -output "$OUTPUT_PATH" &> $QUIET_OUTPUT
 
+# The framework contains static archive members produced by Xcode. Without
+# stripping, those objects retain debug maps with absolute DerivedData paths
+# from the build machine, which later surface as linker warnings for consumers.
+status "Stripping generated static framework debug maps..."
+find "$OUTPUT_PATH" -path "*/CodeLanguages_Container.framework/Versions/A/CodeLanguages_Container" -type f | while IFS= read -r binary; do
+    strip -S -x "$binary"
+    framework_path=$(dirname "$(dirname "$(dirname "$binary")")")
+    codesign --force --sign - "$framework_path" &> $QUIET_OUTPUT
+done
+
 # zip the xcframework
 status "Zipping CodeLanguagesContainer.xcframework..."
 zip -r -q -y "$OUTPUT_PATH".zip "$OUTPUT_PATH"
